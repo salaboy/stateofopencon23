@@ -1,0 +1,190 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: gke.salaboy.com
+  labels:
+    type: development
+    provider: gke
+spec:
+  compositeTypeRef:
+    apiVersion: salaboy.com/v1alpha1
+    kind: Environment
+  writeConnectionSecretsToNamespace: crossplane-system
+  patchSets:
+  - name: metadata
+    patches:
+    - fromFieldPath: metadata.labels
+  resources:
+  - name: gkecluster
+    base:
+      apiVersion: container.gcp.crossplane.io/v1beta2
+      kind: Cluster
+      spec:
+        writeConnectionSecretToRef:
+          name: #patched
+          namespace: #patched
+        forProvider:
+          location: europe-west4
+          initialClusterVersion: latest
+          network: "salaboy-vpc"
+          subnetwork: "salaboy-subnet"
+    patches:
+    - fromFieldPath: metadata.name
+      toFieldPath: metadata.name
+    - fromFieldPath: metadata.name
+      toFieldPath: spec.writeConnectionSecretToRef.name
+      transforms:
+      - type: string
+        string:
+          fmt: '%s-cluster'
+    - fromFieldPath: spec.writeConnectionSecretToRef.namespace
+      toFieldPath: spec.writeConnectionSecretToRef.namespace
+    - fromFieldPath: spec.parameters.version
+      toFieldPath: spec.forProvider.initialClusterVersion
+    - type: ToCompositeFieldPath
+      fromFieldPath: metadata.name
+      toFieldPath: status.clusterName
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.atProvider.status
+      toFieldPath: status.controlPlaneStatus
+    connectionDetails:
+    - fromConnectionSecretKey: kubeconfig
+    - fromConnectionSecretKey: kubeconfig
+      name: value
+    readinessChecks:
+    - type: MatchString
+      fieldPath: status.atProvider.status
+      matchString: RUNNING
+  - name: nodepool
+    base:
+      apiVersion: container.gcp.crossplane.io/v1beta1
+      kind: NodePool
+      spec:
+        forProvider:
+          locations:
+          - europe-west4-b
+          - europe-west4-c
+          - europe-west4-a
+          clusterSelector:
+            matchControllerRef: true
+          config:
+            preemptible: true
+            oauthScopes:
+            - https://www.googleapis.com/auth/cloud-platform
+          initialNodeCount: 1
+          autoscaling:
+            enabled: true
+            maxNodeCount: 3
+            minNodeCount: 1
+          management:
+            autoRepair: true
+            autoUpgrade: false
+    patches:
+    - fromFieldPath: spec.id
+      toFieldPath: metadata.name
+    - fromFieldPath: spec.writeConnectionSecretToRef.namespace
+      toFieldPath: spec.credentials.secretRef.namespace
+    # - fromFieldPath: spec.parameters.minNodeCount
+    #   toFieldPath: spec.forProvider.initialNodeCount
+    # - fromFieldPath: spec.parameters.minNodeCount
+    #   toFieldPath: spec.forProvider.autoscaling.minNodeCount
+    - fromFieldPath: spec.parameters.size
+      toFieldPath: spec.forProvider.config.machineType
+      transforms:
+      - type: map
+        map:
+          small: n1-standard-2
+          medium: n1-standard-4
+          large: n1-standard-16
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.atProvider.status
+      toFieldPath: status.nodePoolStatus
+    readinessChecks:
+    - type: MatchString
+      fieldPath: status.atProvider.status
+      matchString: RUNNING
+  - name: cloudmemorystoreinstance
+    base:
+      apiVersion: cache.gcp.crossplane.io/v1beta1
+      kind: CloudMemorystoreInstance
+      spec:
+        forProvider:
+          authorizedNetwork: "projects/strong-harbor-338418/global/networks/salaboy-vpc"
+          region: europe-west2
+          tier: BASIC
+          memorySizeGb: 1
+        writeConnectionSecretToRef:
+          namespace: crossplane-system
+    patches:
+      - fromFieldPath: "metadata.uid"
+        toFieldPath: "spec.writeConnectionSecretToRef.name"
+        transforms:
+          - type: string
+            string:
+              fmt: "%s-redis"
+      - fromFieldPath: "spec.parameters.memorySizeGb"
+        toFieldPath: "spec.forProvider.settings.memorySizeGb"
+    connectionDetails:
+      - fromConnectionSecretKey: username
+      - fromConnectionSecretKey: password
+      - fromConnectionSecretKey: endpoint
+      - type: FromValue
+        name: port
+        value: "6379"
+  - name: helm
+    base:
+      apiVersion: helm.crossplane.io/v1beta1
+      kind: ProviderConfig
+      spec:
+        credentials:
+          source: Secret
+          secretRef:
+            name: #patched
+            key: kubeconfig
+        identity:
+          type: GoogleApplicationCredentials
+          source: Secret
+          secretRef:
+            name: gcp-creds
+            namespace: crossplane-system
+            key: creds
+    patches:
+    - fromFieldPath: metadata.name
+      toFieldPath: metadata.name
+    - fromFieldPath: spec.writeConnectionSecretToRef.namespace
+      toFieldPath: spec.credentials.secretRef.namespace
+    - fromFieldPath: metadata.name
+      toFieldPath: spec.credentials.secretRef.name
+      transforms:
+      - type: string
+        string:
+          fmt: '%s-cluster'
+    readinessChecks:
+    - type: None
+  - name: dapr
+    base:
+      apiVersion: helm.crossplane.io/v1beta1
+      kind: Release
+      spec:
+        forProvider:
+          namespace: dapr-system
+          chart:
+            name: dapr
+            repository: https://dapr.github.io/helm-charts/
+            version: "1.9.5"
+          values:
+          providerConfigRef: 
+            name: #patched
+    patches:
+    - fromFieldPath: metadata.name
+      toFieldPath: metadata.name
+      transforms:
+      - type: string
+        string:
+          fmt: '%s-dapr'
+    - fromFieldPath: metadata.name
+      toFieldPath: spec.providerConfigRef.name
+    readinessChecks:
+      - type: MatchString
+        fieldPath: status.atProvider.state
+        matchString: deployed

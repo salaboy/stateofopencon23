@@ -1,0 +1,32 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: webapp
+spec:
+  template:
+    metadata:
+      annotations: 
+        autoscaling.knative.dev/min-scale: "1"
+        #dapr.io/config: tracing
+        dapr.io/app-id: webapp
+        dapr.io/app-port: "8080"
+        dapr.io/enabled: "true"
+        dapr.io/metrics-port: "9099"
+    spec:
+      containers:
+        - image: docker.io/salaboy/webapp-5dd817b6438eb2b7aec9bd0d6b49d12b@sha256:827e3a56a2aaf5237919cb8963388344718af2cb4cb21a6997ee9a14a2c83846
+          livenessProbe:
+            httpGet:
+              path: /info
+              port: 0
+          name: user-container
+          readinessProbe:
+            httpGet:
+              path: /info
+              port: 0
+          resources: {}
+      enableServiceLinks: false
+      timeoutSeconds: 300
+  traffic:
+    - latestRevision: true
+      percent: 100
