@@ -13,7 +13,6 @@ This Crossplane Composite resource creates the following resources:
 
 In a GCP Kubernetes Cluster install the following components.
 
-
 Let's install [Crossplane](https://crossplane.io) into its own namespace using Helm: 
 
 ```
@@ -46,6 +45,13 @@ kubectl create clusterrolebinding provider-helm-admin-binding --clusterrole clus
 ```
 kubectl apply -f crossplane/config/helm-provider-config.yaml
 ```
+
+We also need to install the Crossplane Kubernetes Provider if we want to install custom resources. 
+
+```
+kubectl crossplane install provider crossplane/provider-kubernetes:v0.6.0
+```
+
 
 ## Install & Configure GCP provider
 
