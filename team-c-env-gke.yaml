@@ -1,0 +1,12 @@
+apiVersion: salaboy.com/v1alpha1
+kind: Environment
+metadata:
+  name: team-c-env
+spec:
+  compositionSelector:
+    matchLabels:
+      provider: gke
+      type: development
+  parameters: 
+    size: small
+    

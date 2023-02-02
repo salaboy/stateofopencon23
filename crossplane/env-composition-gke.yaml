@@ -161,6 +161,36 @@ spec:
           fmt: '%s-cluster'
     readinessChecks:
     - type: None
+  - name: k8s
+    base:
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: ProviderConfig
+      spec:
+        credentials:
+          source: Secret
+          secretRef:
+            name: #patched
+            key: kubeconfig
+        identity:
+          type: GoogleApplicationCredentials
+          source: Secret
+          secretRef:
+            name: gcp-creds
+            namespace: crossplane-system
+            key: creds
+    patches:
+    - fromFieldPath: metadata.name
+      toFieldPath: metadata.name
+    - fromFieldPath: spec.writeConnectionSecretToRef.namespace
+      toFieldPath: spec.credentials.secretRef.namespace
+    - fromFieldPath: metadata.name
+      toFieldPath: spec.credentials.secretRef.name
+      transforms:
+      - type: string
+        string:
+          fmt: '%s-cluster'
+    readinessChecks:
+    - type: None
   - name: dapr
     base:
       apiVersion: helm.crossplane.io/v1beta1
@@ -194,6 +224,8 @@ spec:
         kind: Object
         spec:
           forProvider:
+            providerConfigRef: 
+              name: #patched
             manifest:
               apiVersion: dapr.io/v1alpha1
               kind: Component
@@ -213,4 +245,6 @@ spec:
     patches:
       - fromFieldPath: metadata.name
         toFieldPath: "spec.metadata[0].value"
+      - fromFieldPath: metadata.name
+        toFieldPath: spec.providerConfigRef.name  
       

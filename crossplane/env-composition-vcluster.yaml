@@ -29,7 +29,7 @@ spec:
             values:
               multiNamespaceMode:
                 enabled: true
-              syncer:
+              sync:
                 generic:
                   clusterRole:
                     extraRules:

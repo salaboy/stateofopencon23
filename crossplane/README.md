@@ -52,6 +52,13 @@ We also need to install the Crossplane Kubernetes Provider if we want to install
 kubectl crossplane install provider crossplane/provider-kubernetes:v0.6.0
 ```
 
+And then configure it (this is only necessary if we are planning to install a kubernetes resource in the cluster where crossplane is installed):
+
+```
+kubectl apply -f crossplane/config/kubernetes-provider-config.yaml
+```
+
+
 
 ## Install & Configure GCP provider
 
