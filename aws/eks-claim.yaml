@@ -1,0 +1,21 @@
+apiVersion: aws.platformref.upbound.io/v1alpha1
+kind: XEKS
+metadata:
+  name: usw2-pf-cluster-demo
+  namespace: default
+spec:
+  id: usw2-pf-cluster-demo
+  parameters:
+    subnetIds: ["subnet-037ea93ba28bca50e","subnet-0fad7203befada6c0", "subnet-067e079c3f3c21dcb"]
+    securityGroupIds: ["sg-0fae105bbdcac8438"]
+    nodes:
+      count: 3
+      size: small
+    region: us-west-2
+    version: "1.24"
+    environment: prod
+
+  ## This section is for DevOps
+  writeConnectionSecretToRef:
+    name: platform-ref-aws-kubeconfig
+    namespace: default

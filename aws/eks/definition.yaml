@@ -1,0 +1,85 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xeks.aws.platformref.upbound.io
+spec:
+  connectionSecretKeys:
+  - kubeconfig
+  group: aws.platformref.upbound.io
+  names:
+    kind: XEKS
+    plural: xeks
+  versions:
+  - name: v1alpha1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              id:
+                type: string
+                description: ID of this Cluster that other objects will use to refer to it.
+              parameters:
+                type: object
+                description: EKS configuration parameters.
+                properties:
+                  subnetIds:
+                    type: array
+                    items:
+                      type: string
+                  version:
+                    description: Version of Kubernetes
+                    type: string       
+                  region:
+                    description: Geographic location of this VPC
+                    type: string       
+                    enum: ["us-east-2", "us-west-2", "eu-central-1", "ap-southeast-2"]
+                  securityGroupIds:
+                    type: array
+                    items:
+                      type: string
+                  environment:
+                    type: string
+                    description: Environment for infrastructure to be deployed into
+                    enum:
+                    - dev
+                    - staging
+                    - prod
+                  nodes:
+                    type: object
+                    description: EKS node configuration parameters.
+                    properties:
+                      count:
+                        type: integer
+                        description: Desired node count, from 1 to 100.
+                      size:
+                        type: string
+                        description: Size of node.
+                        enum:
+                        - small
+                        - medium
+                        - large
+                    required:
+                    - count
+                    - size
+                required:
+                - region
+                - environment
+                - version
+                - nodes
+                - subnetIds
+                # - securityGroupIds
+            required:
+            - parameters
+          status:
+            description: A Status represents the observed state
+            properties:
+              eks:
+                description: Freeform field containing status information for eks
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+            type: object
