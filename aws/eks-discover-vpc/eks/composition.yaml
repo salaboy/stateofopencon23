@@ -3,6 +3,7 @@ kind: Composition
 metadata:
   name: xeks.aws.platformref.upbound.io
   labels:
+    type: development
     provider: aws
 spec:
   writeConnectionSecretsToNamespace: upbound-system
@@ -11,18 +12,9 @@ spec:
     kind: XEKS
   
   patchSets:
-    - name: common-parameters
-      patches:
-        - fromFieldPath: spec.parameters.region
-          toFieldPath: spec.forProvider.region
-        - fromFieldPath: spec.parameters.environment
-          toFieldPath: spec.providerConfigRef.name
-          transforms:
-            - type: map
-              map:
-                dev: "dev-test"
-                staging: "staging-test"
-                prod: "aws-provider"
+  - name: metadata
+    patches:
+    - fromFieldPath: metadata.labels  
 
   resources:
     - base:
@@ -51,10 +43,6 @@ spec:
                 ]
               }
       name: controlplaneRole
-      patches:
-          # Change to spec id
-        - type: PatchSet
-          patchSetName: common-parameters
 
     - base:
         apiVersion: iam.aws.upbound.io/v1beta1
@@ -67,16 +55,13 @@ spec:
               matchLabels:
                 role: controlplane
       name: clusterRolePolicyAttachment
-      patches:
-          # Change to spec id
-        - type: PatchSet
-          patchSetName: common-parameters
 
     - base:
         apiVersion: eks.aws.upbound.io/v1beta1
         kind: Cluster
         spec:
           forProvider:
+            region: us-west-2
             roleArnSelector:
               matchControllerRef: true
               matchLabels:
@@ -84,13 +69,10 @@ spec:
             vpcConfig:
               - endpointPrivateAccess: true
                 endpointPublicAccess: true
+            version: "1.23"
       name: kubernetesCluster
       patches:
           # Change to spec id
-        - type: PatchSet
-          patchSetName: common-parameters
-        - fromFieldPath: spec.parameters.version
-          toFieldPath: spec.forProvider.version
         - fromFieldPath: spec.parameters.securityGroupIds
           toFieldPath: spec.forProvider.vpcConfig[0].securityGroupIds
         - fromFieldPath: spec.parameters.subnetIds
@@ -111,20 +93,13 @@ spec:
         kind: ClusterAuth
         spec:
           forProvider:
+            region: us-west-2
             clusterNameSelector:
               matchControllerRef: true
+          writeConnectionSecretToRef:
+            name: platform-ref-aws-kubeconfig
+            namespace: default
       name: kubernetesClusterAuth
-      patches:
-        - type: PatchSet
-          patchSetName: common-parameters
-        - fromFieldPath: spec.writeConnectionSecretToRef.namespace
-          toFieldPath: spec.writeConnectionSecretToRef.namespace
-        - fromFieldPath: metadata.uid
-          toFieldPath: spec.writeConnectionSecretToRef.name
-          transforms:
-            - type: string
-              string:
-                fmt: "%s-ekscluster"
       connectionDetails:
         - fromConnectionSecretKey: kubeconfig
 
@@ -154,10 +129,6 @@ spec:
                 ]
               }
       name: nodegroupRole
-      patches:
-          # Change to spec id
-        - type: PatchSet
-          patchSetName: common-parameters
 
     - base:
         apiVersion: iam.aws.upbound.io/v1beta1
@@ -170,10 +141,6 @@ spec:
               matchLabels:
                 role: nodegroup
       name: workerNodeRolePolicyAttachment
-      patches:
-          # Change to spec id
-        - type: PatchSet
-          patchSetName: common-parameters
 
     - base:
         apiVersion: iam.aws.upbound.io/v1beta1
@@ -186,10 +153,6 @@ spec:
               matchLabels:
                 role: nodegroup
       name: cniRolePolicyAttachment
-      patches:
-          # Change to spec id
-        - type: PatchSet
-          patchSetName: common-parameters
 
     - base:
         apiVersion: iam.aws.upbound.io/v1beta1
@@ -202,16 +165,13 @@ spec:
               matchLabels:
                 role: nodegroup
       name: containerRegistryRolePolicyAttachment
-      patches:
-          # Change to spec id
-        - type: PatchSet
-          patchSetName: common-parameters
 
     - base:
         apiVersion: eks.aws.upbound.io/v1beta1
         kind: NodeGroup
         spec:
           forProvider:
+            region: us-west-2
             clusterNameSelector:
               matchControllerRef: true
             nodeRoleArnSelector:
@@ -226,8 +186,6 @@ spec:
               - t3.medium
       name: nodeGroupPrivate
       patches:
-        - type: PatchSet
-          patchSetName: common-parameters
         - fromFieldPath: spec.parameters.subnetIds
           toFieldPath: spec.forProvider.subnetIds
         - fromFieldPath: spec.parameters.nodes.count
@@ -266,19 +224,11 @@ spec:
             source: Secret
             secretRef:
               key: kubeconfig
+              name: platform-ref-aws-kubeconfig
+              namespace: default
       name: providerConfig
       patches:
         - fromFieldPath: spec.id
           toFieldPath: metadata.name
-        - fromFieldPath: spec.writeConnectionSecretToRef.namespace
-          toFieldPath: spec.credentials.secretRef.namespace
-        # This ProviderConfig uses the above EKS cluster's connection secret as
-        # its credentials secret.
-        - fromFieldPath: metadata.uid
-          toFieldPath: spec.credentials.secretRef.name
-          transforms:
-            - type: string
-              string:
-                fmt: "%s-ekscluster"
       readinessChecks:
         - type: None
