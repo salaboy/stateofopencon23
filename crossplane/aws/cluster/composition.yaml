@@ -2,6 +2,9 @@ apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
 metadata:
   name: xclusters.aws.platformref.upbound.io
+  labels:
+    type: development
+    provider: aws
 spec:
   writeConnectionSecretsToNamespace: upbound-system
   compositeTypeRef:
@@ -36,7 +39,7 @@ spec:
           toFieldPath: spec.id
         - fromFieldPath: spec.id
           toFieldPath: metadata.annotations[crossplane.io/external-name]
-        - fromFieldPath: metadata.uid
+        - fromFieldPath: metadata.name
           toFieldPath: spec.writeConnectionSecretToRef.name
           transforms:
             - type: string
@@ -61,5 +64,3 @@ spec:
       patches:
         - fromFieldPath: spec.id
           toFieldPath: spec.providerConfigRef.name
-        - fromFieldPath: spec.parameters.services.operators.prometheus.version
-          toFieldPath: spec.operators.prometheus.version

@@ -1,7 +1,0 @@
-apiVersion: pkg.crossplane.io/v1
-kind: Configuration
-metadata:
-  name: eks-create-vpc
-spec:
-  packagePullPolicy: Always
-  package: xpkg.upbound.io/asarenkansah/xeks:v1.0.3

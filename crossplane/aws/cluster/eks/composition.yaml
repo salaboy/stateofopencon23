@@ -3,19 +3,12 @@ kind: Composition
 metadata:
   name: xeks.aws.platformref.upbound.io
   labels:
-    type: development
     provider: aws
 spec:
   writeConnectionSecretsToNamespace: upbound-system
   compositeTypeRef:
     apiVersion: aws.platformref.upbound.io/v1alpha1
     kind: XEKS
-  
-  patchSets:
-  - name: metadata
-    patches:
-    - fromFieldPath: metadata.labels  
-
   resources:
     - base:
         apiVersion: iam.aws.upbound.io/v1beta1
@@ -43,7 +36,6 @@ spec:
                 ]
               }
       name: controlplaneRole
-
     - base:
         apiVersion: iam.aws.upbound.io/v1beta1
         kind: RolePolicyAttachment
@@ -55,7 +47,6 @@ spec:
               matchLabels:
                 role: controlplane
       name: clusterRolePolicyAttachment
-
     - base:
         apiVersion: eks.aws.upbound.io/v1beta1
         kind: Cluster
@@ -82,12 +73,6 @@ spec:
           toFieldPath: status.eks.oidc
           policy:
             fromFieldPath: Optional
-        - fromFieldPath: spec.id
-          toFieldPath: metadata.name
-        - type: ToCompositeFieldPath
-          fromFieldPath: metadata.name
-          toFieldPath: status.clusterName
-
     - base:
         apiVersion: eks.aws.upbound.io/v1beta1
         kind: ClusterAuth
@@ -96,13 +81,18 @@ spec:
             region: us-west-2
             clusterNameSelector:
               matchControllerRef: true
-          writeConnectionSecretToRef:
-            name: platform-ref-aws-kubeconfig
-            namespace: default
       name: kubernetesClusterAuth
+      patches:
+        - fromFieldPath: spec.writeConnectionSecretToRef.namespace
+          toFieldPath: spec.writeConnectionSecretToRef.namespace
+        - fromFieldPath: metadata.name
+          toFieldPath: spec.writeConnectionSecretToRef.name
+          transforms:
+            - type: string
+              string:
+                fmt: "%s-ekscluster"
       connectionDetails:
         - fromConnectionSecretKey: kubeconfig
-
     - base:
         apiVersion: iam.aws.upbound.io/v1beta1
         kind: Role
@@ -129,7 +119,6 @@ spec:
                 ]
               }
       name: nodegroupRole
-
     - base:
         apiVersion: iam.aws.upbound.io/v1beta1
         kind: RolePolicyAttachment
@@ -141,7 +130,6 @@ spec:
               matchLabels:
                 role: nodegroup
       name: workerNodeRolePolicyAttachment
-
     - base:
         apiVersion: iam.aws.upbound.io/v1beta1
         kind: RolePolicyAttachment
@@ -153,7 +141,6 @@ spec:
               matchLabels:
                 role: nodegroup
       name: cniRolePolicyAttachment
-
     - base:
         apiVersion: iam.aws.upbound.io/v1beta1
         kind: RolePolicyAttachment
@@ -165,7 +152,6 @@ spec:
               matchLabels:
                 role: nodegroup
       name: containerRegistryRolePolicyAttachment
-
     - base:
         apiVersion: eks.aws.upbound.io/v1beta1
         kind: NodeGroup
@@ -178,16 +164,17 @@ spec:
               matchControllerRef: true
               matchLabels:
                 role: nodegroup
+            subnetIdSelector:
+              matchLabels:
+                access: public
             scalingConfig:
               - minSize: 1
                 maxSize: 100
-                desiredSize: 1
+                desiredSize: 3
             instanceTypes:
               - t3.medium
-      name: nodeGroupPrivate
+      name: nodeGroupPublic
       patches:
-        - fromFieldPath: spec.parameters.subnetIds
-          toFieldPath: spec.forProvider.subnetIds
         - fromFieldPath: spec.parameters.nodes.count
           toFieldPath: spec.forProvider.scalingConfig[0].desiredSize
         - fromFieldPath: spec.parameters.nodes.size
@@ -199,8 +186,7 @@ spec:
                 medium: t3.medium
                 large: t3.large
         - fromFieldPath: spec.id
-          toFieldPath: metadata.name
-
+          toFieldPath: spec.forProvider.subnetIdSelector.matchLabels[networks.aws.platformref.upbound.io/network-id]
     - base:
         apiVersion: iam.aws.upbound.io/v1beta1
         kind: OpenIDConnectProvider
@@ -224,11 +210,19 @@ spec:
             source: Secret
             secretRef:
               key: kubeconfig
-              name: platform-ref-aws-kubeconfig
-              namespace: default
       name: providerConfig
       patches:
         - fromFieldPath: spec.id
           toFieldPath: metadata.name
+        - fromFieldPath: spec.writeConnectionSecretToRef.namespace
+          toFieldPath: spec.credentials.secretRef.namespace
+        # This ProviderConfig uses the above EKS cluster's connection secret as
+        # its credentials secret.
+        - fromFieldPath: metadata.name
+          toFieldPath: spec.credentials.secretRef.name
+          transforms:
+            - type: string
+              string:
+                fmt: "%s-ekscluster"
       readinessChecks:
         - type: None

@@ -1,13 +1,14 @@
 apiVersion: aws.platformref.upbound.io/v1alpha1
-kind: XEKS
+kind: Cluster
 metadata:
-  name: usw2-pf-cluster-demo
+  name: team-d-env
+  namespace: default
 spec:
   compositionSelector:
     matchLabels:
       provider: aws
       type: development
-  id: usw2-pf-cluster-demo
+  id: team-d-env
   parameters:
     nodes:
       count: 3
